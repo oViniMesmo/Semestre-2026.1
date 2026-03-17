@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleprompter Pro - Diretor Master</title>
+    <style>
+        :root {
+            --bg-dark: #0f0f13;
+            --bg-panel: #1e1e26;
+            --accent: #00e676;
+            --accent-hover: #00c853;
+            --danger: #ff5252;
+            --info: #00b0ff;
+            --text-main: #e0e0e0;
+            --text-dim: #94a3b8;
+        }
+
+        * { box-sizing: border-box; transition: background 0.2s, transform 0.1s; }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        .hidden { display: none !important; }
+        .btn { 
+            padding: 12px; border: none; border-radius: 8px; font-weight: 600; 
+            cursor: pointer; width: 100%; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+        .btn-danger { background: rgba(255, 82, 82, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+        .btn-info { background: rgba(0, 176, 255, 0.1); color: var(--info); border: 1px solid var(--info); }
+
+        /* --- LAYOUT EDITOR --- */
+        #editor-ui { display: grid; grid-template-columns: 350px 1fr; height: 100vh; }
+        .sidebar { background: var(--bg-panel); padding: 20px; border-right: 1px solid #333; overflow-y: auto; }
+        .main-editor { padding: 20px; display: flex; flex-direction: column; }
+        textarea { 
+            flex-grow: 1; background: #16161d; color: #fff; border: 1px solid #333;
+            border-radius: 12px; padding: 20px; font-size: 1.1rem; resize: none; outline: none; line-height: 1.6;
+        }
+
+        /* --- LAYOUT LEITOR & MONITOR --- */
+        .display-view { 
+            height: 100vh; width: 100vw; background: #000; 
+            overflow-y: scroll; scrollbar-width: none; 
+        }
+        .display-view::-webkit-scrollbar { display: none; }
+        
+        #text-content {
+            width: 80%; margin: 0 auto; padding: 45vh 0;
+            font-size: 80px; font-weight: 700; line-height: 1.5; text-align: center;
+        }
+        .mirrored { transform: scaleX(-1); }
+
+        .guide {
+            position: fixed; top: 50%; left: 0; width: 100%; height: 120px;
+            transform: translateY(-50%); background: rgba(0, 230, 118, 0.08);
+            border-top: 1px solid rgba(0, 230, 118, 0.3);
+            border-bottom: 1px solid rgba(0, 230, 118, 0.3);
+            pointer-events: none; z-index: 100;
+        }
+
+        /* Painel Diretor flutuante */
+        .director-controls {
+            position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+            width: 450px; background: rgba(30, 30, 38, 0.95); padding: 15px;
+            border-radius: 20px; border: 1px solid var(--accent);
+            backdrop-filter: blur(10px); z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .control-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. INTERFACE EDITOR -->
+    <div id="editor-ui">
+        <div class="sidebar">
+            <h2 style="color: var(--accent); margin-top: 0;">PROMPTER MASTER</h2>
+            <button class="btn btn-primary" onclick="openWindow('reader')">📺 TELA DO LEITOR</button>
+            <button class="btn btn-outline" onclick="openWindow('monitor')">👁️ MONITOR DIRETOR</button>
+
+            <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+
+            <button id="btnPlay" class="btn btn-outline" onclick="togglePlay()">▶ PLAY (Espaço)</button>
+            <button class="btn btn-danger" onclick="resetScroll()">🔄 RESETAR</button>
+
+            <label>Velocidade: <span id="speedVal">15</span></label>
+            <input type="range" id="speed" min="0" max="100" value="15" style="width:100%" oninput="updateSettings()">
+
+            <label>Fonte: <span id="fontVal">80</span>px</label>
+            <input type="range" id="fontSize" min="30" max="200" value="80" style="width:100%" oninput="updateSettings()">
+        </div>
+        <div class="main-editor">
+            <label>Roteiro</label>
+            <textarea id="inputText" oninput="syncText()">Bem-vindo ao sistema profissional.
+
+DIRETOR: Use os botões de VOLTAR e AVANÇAR na sua aba para pular trechos. Você também pode rolar a página manualmente com o mouse e o leitor acompanhará.
+
+A sincronização é total!</textarea>
+        </div>
+    </div>
+
+    <!-- 2. INTERFACE EXIBIÇÃO -->
+    <div id="display-ui" class="display-view hidden">
+        <div class="guide"></div>
+        <div id="text-content"></div>
+
+        <!-- CONTROLES EXCLUSIVOS DO DIRETOR -->
+        <div id="director-panel" class="director-controls hidden">
+            <div class="control-row">
+                <button class="btn btn-info" onclick="jumpScroll(-300)">⏮ VOLTAR</button>
+                <button id="btnPlayMon" class="btn btn-primary" onclick="togglePlay()">▶ PLAY</button>
+                <button class="btn btn-info" onclick="jumpScroll(300)">AVANÇAR ⏭</button>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div style="flex: 1;">
+                    <label>Velocidade</label>
+                    <input type="range" id="speedMon" min="0" max="100" value="15" style="width:100%" oninput="updateSpeedFromMon(this.value)">
+                </div>
+                <button class="btn btn-danger" style="width: 80px; margin: 0;" onclick="resetScroll()">REFAZER</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const bc = new BroadcastChannel('tp_system_v2');
+        const urlParams = new URLSearchParams(window.location.search);
+        const viewType = urlParams.get('view'); 
+
+        const displayUI = document.getElementById('display-ui');
+        const textContent = document.getElementById('text-content');
+        const inputText = document.getElementById('inputText');
+        const directorPanel = document.getElementById('director-panel');
+
+        let state = {
+            playing: false,
+            scrollPos: 0,
+            speed: 15,
+            fontSize: 80,
+            mirrored: true,
+            text: ""
+        };
+
+        // --- INICIALIZAÇÃO ---
+        if (viewType) {
+            document.getElementById('editor-ui').classList.add('hidden');
+            displayUI.classList.remove('hidden');
+            if (viewType === 'reader') textContent.classList.add('mirrored');
+            if (viewType === 'monitor') directorPanel.classList.remove('hidden');
+            requestAnimationFrame(scrollLoop);
+        }
+
+        // --- ROLAGEM MANUAL DO DIRETOR (SINCRO) ---
+        if (viewType === 'monitor') {
+            displayUI.addEventListener('scroll', () => {
+                // Só envia o scroll manual se NÃO estiver tocando automaticamente
+                if (!state.playing) {
+                    state.scrollPos = displayUI.scrollTop;
+                    bc.postMessage({ scrollPos: state.scrollPos, forceScroll: state.scrollPos });
+                }
+            });
+        }
+
+        // --- COMUNICAÇÃO ---
+        bc.onmessage = (e) => {
+            const data = e.data;
+            state = { ...state, ...data };
+
+            if (viewType) {
+                if (data.text !== undefined) textContent.innerText = state.text;
+                if (data.fontSize !== undefined) textContent.style.fontSize = state.fontSize + 'px';
+                if (data.forceScroll !== undefined) {
+                    state.scrollPos = data.forceScroll;
+                    displayUI.scrollTop = data.forceScroll;
+                }
+            }
+            
+            // Atualizar botões de Play visualmente
+            const btnEditor = document.getElementById('btnPlay');
+            const btnMonitor = document.getElementById('btnPlayMon');
+            const playLabel = state.playing ? "⏸ PAUSAR" : "▶ INICIAR";
+            if (btnEditor) btnEditor.innerText = playLabel;
+            if (btnMonitor) btnMonitor.innerText = playLabel;
+        };
+
+        // --- LOOP DE ROLAGEM ---
+        function scrollLoop() {
+            if (state.playing) {
+                state.scrollPos += parseFloat(state.speed) / 15;
+                displayUI.scrollTop = state.scrollPos;
+                
+                // Monitor informa sua posição para o Leitor durante o Play
+                if (viewType === 'monitor') {
+                    bc.postMessage({ scrollPos: state.scrollPos, forceScroll: state.scrollPos });
+                }
+            }
+            requestAnimationFrame(scrollLoop);
+        }
+
+        // --- FUNÇÕES MASTER ---
+        function jumpScroll(amount) {
+            state.scrollPos += amount;
+            if (state.scrollPos < 0) state.scrollPos = 0;
+            displayUI.scrollTop = state.scrollPos;
+            bc.postMessage({ scrollPos: state.scrollPos, forceScroll: state.scrollPos });
+        }
+
+        function togglePlay() {
+            state.playing = !state.playing;
+            bc.postMessage({ playing: state.playing });
+        }
+
+        function resetScroll() {
+            state.playing = false;
+            state.scrollPos = 0;
+            bc.postMessage({ playing: false, scrollPos: 0, forceScroll: 0 });
+        }
+
+        function syncText() {
+            state.text = inputText.value;
+            bc.postMessage({ text: state.text });
+        }
+
+        function updateSettings() {
+            state.speed = document.getElementById('speed').value;
+            state.fontSize = document.getElementById('fontSize').value;
+            document.getElementById('speedVal').innerText = state.speed;
+            document.getElementById('fontVal').innerText = state.fontSize;
+            bc.postMessage({ speed: state.speed, fontSize: state.fontSize });
+        }
+
+        function updateSpeedFromMon(val) {
+            state.speed = val;
+            bc.postMessage({ speed: state.speed });
+        }
+
+        function openWindow(type) {
+            window.open(window.location.href + '?view=' + type, '_blank');
+            setTimeout(() => bc.postMessage(state), 500);
+        }
+
+        function toggleMirror() {
+            state.mirrored = !state.mirrored;
+            bc.postMessage({ mirrored: state.mirrored });
+        }
+
+        // Atalho Espaço
+        window.addEventListener('keydown', (e) => {
+            if (e.code === "Space" && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                togglePlay();
+            }
+        });
+
+        if (!viewType) syncText();
+    </script>
+</body>
+</html>

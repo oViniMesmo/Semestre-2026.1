@@ -1,0 +1,12 @@
+/* style.css */
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+.conta { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+.saldo { background: #2ecc71; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+.operacoes input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+.botoes { display: flex; gap: 10px; }
+button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
+.btn-deposito { background-color: #3498db; }
+.btn-saque { background-color: #e74c3c; }
+.extrato { margin-top: 30px; }
+ul { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; }
+li { padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }

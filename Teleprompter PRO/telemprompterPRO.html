@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleprompter Pro - Studio Edition</title>
+    <style>
+        /* --- Camada de Design (CSS) --- */
+        :root {
+            --bg-dark: #0f0f13;
+            --bg-panel: #1e1e26;
+            --accent: #00e676; /* Verde Neon */
+            --accent-hover: #00c853;
+            --danger: #ff5252;
+            --text-main: #e0e0e0;
+            --text-dim: #94a3b8;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { box-sizing: border-box; transition: all 0.2s ease; }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* --- Interface do Controlador --- */
+        #controller-ui {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: 100vh;
+        }
+
+        /* Painel Lateral de Controles */
+        .sidebar {
+            background: var(--bg-panel);
+            padding: 25px;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 10px 0 15px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        h1 { font-size: 1.2rem; margin: 0 0 10px 0; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+
+        .control-group {
+            background: var(--glass);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        label { display: block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+
+        /* Inputs e Sliders */
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: #444;
+            border-radius: 5px;
+            appearance: none;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* Botões */
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        
+        .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+        .btn-outline:hover { background: rgba(0, 230, 118, 0.1); }
+
+        .btn-danger { background: rgba(255, 82, 82, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+
+        /* Área de Texto */
+        .main-content { padding: 25px; display: flex; flex-direction: column; }
+        
+        textarea {
+            flex-grow: 1;
+            background: #16161d;
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        textarea:focus { border-color: var(--accent); }
+
+        /* --- Interface do Leitor (Aba de Leitura) --- */
+        #reader-ui {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            background: #000;
+            overflow-y: scroll;
+            scrollbar-width: none;
+            scroll-behavior: auto; /* Importante para rolagem suave via JS */
+        }
+        #reader-ui::-webkit-scrollbar { display: none; }
+
+        #prompter-text {
+            width: 85%;
+            margin: 0 auto;
+            padding: 50vh 0; /* Padding para começar do meio */
+            font-size: 80px;
+            font-weight: 700;
+            line-height: 1.4;
+            color: white;
+            text-align: center;
+        }
+
+        .mirrored { transform: scaleX(-1); }
+
+        /* Guia Visual Central */
+        .guide-overlay {
+            position: fixed;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            transform: translateY(-50%);
+            background: rgba(0, 230, 118, 0.07);
+            border-top: 1px solid rgba(0, 230, 118, 0.3);
+            border-bottom: 1px solid rgba(0, 230, 118, 0.3);
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .guide-arrow {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent);
+            font-size: 40px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- UI DO CONTROLADOR -->
+    <div id="controller-ui">
+        <div class="sidebar">
+            <h1>Teleprompter Pro</h1>
+            
+            <button class="btn-primary" onclick="openReader()">
+                <span>📺</span> ABRIR TELA DE LEITURA
+            </button>
+
+            <div class="control-group">
+                <label>Playback</label>
+                <button id="btnPlay" class="btn-outline" onclick="togglePlay()">▶ INICIAR (Espaço)</button>
+                <button class="btn-danger" onclick="resetScroll()">🔄 RECOMEÇAR</button>
+            </div>
+
+            <div class="control-group">
+                <label>Velocidade: <span id="speedVal">5</span></label>
+                <input type="range" id="speed" min="0" max="100" value="15" oninput="updateSettings()">
+            </div>
+
+            <div class="control-group">
+                <label>Tamanho da Fonte: <span id="fontVal">80</span>px</label>
+                <input type="range" id="fontSize" min="30" max="200" value="80" oninput="updateSettings()">
+            </div>
+
+            <div class="control-group">
+                <label>Modo de Exibição</label>
+                <button id="btnMirror" class="btn-outline" onclick="toggleMirror()">ESPELHAMENTO: ON</button>
+            </div>
+
+            <div style="margin-top: auto; font-size: 10px; color: var(--text-dim); text-align: center;">
+                Controle o texto em tempo real aqui.
+            </div>
+        </div>
+
+        <div class="main-content">
+            <label>Roteiro / Texto</label>
+            <textarea id="inputText" placeholder="Cole seu texto aqui..." oninput="syncText()">Bem-vindo ao Teleprompter Pro.
+
+Esta é a aba de controle. O texto que você edita aqui é atualizado instantaneamente na aba de leitura.
+
+1. Clique em "ABRIR TELA DE LEITURA".
+2. Posicione a nova aba no monitor do seu teleprompter.
+3. Use o botão play ou a tecla ESPAÇO para rolar.
+
+Aproveite sua gravação!</textarea>
+        </div>
+    </div>
+
+    <!-- UI DO LEITOR -->
+    <div id="reader-ui">
+        <div class="guide-overlay">
+            <div class="guide-arrow">➤</div>
+        </div>
+        <div id="prompter-text"></div>
+    </div>
+
+    <script>
+        const bc = new BroadcastChannel('tp_channel');
+        const isReader = new URLSearchParams(window.location.search).get('view') === 'reader';
+        
+        const readerUI = document.getElementById('reader-ui');
+        const prompterText = document.getElementById('prompter-text');
+        const inputText = document.getElementById('inputText');
+
+        let scrollPos = 0;
+        let isPlaying = false;
+        let isMirrored = true;
+        let animationFrame;
+
+        // --- INICIALIZAÇÃO ---
+        if (isReader) {
+            document.getElementById('controller-ui').style.display = 'none';
+            readerUI.style.display = 'block';
+            document.title = "LEITURA - Teleprompter";
+        }
+
+        // --- COMUNICAÇÃO ---
+        bc.onmessage = (e) => {
+            const { type, val } = e.data;
+            if (isReader) {
+                if (type === 'text') prompterText.innerText = val;
+                if (type === 'settings') applySettings(val);
+                if (type === 'play') isPlaying = val;
+                if (type === 'reset') { scrollPos = 0; readerUI.scrollTop = 0; }
+            }
+        };
+
+        function openReader() {
+            window.open(window.location.href + '?view=reader', '_blank');
+            setTimeout(() => { syncText(); updateSettings(); }, 500);
+        }
+
+        // --- LOGICA DE ROLAGEM SUAVE ---
+        function scrollLoop() {
+            if (isPlaying && isReader) {
+                const speed = parseFloat(currentSettings.speed) / 10;
+                scrollPos += speed;
+                readerUI.scrollTop = scrollPos;
+            }
+            requestAnimationFrame(scrollLoop);
+        }
+        if (isReader) requestAnimationFrame(scrollLoop);
+
+        // --- FUNÇÕES DE COMANDO ---
+        function syncText() {
+            bc.postMessage({ type: 'text', val: inputText.value });
+        }
+
+        let currentSettings = { speed: 15, fontSize: 80, mirrored: true };
+
+        function updateSettings() {
+            currentSettings = {
+                speed: document.getElementById('speed').value,
+                fontSize: document.getElementById('fontSize').value,
+                mirrored: isMirrored
+            };
+            document.getElementById('speedVal').innerText = currentSettings.speed;
+            document.getElementById('fontVal').innerText = currentSettings.fontSize;
+            bc.postMessage({ type: 'settings', val: currentSettings });
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('btnPlay').innerText = isPlaying ? "⏸ PAUSAR (Espaço)" : "▶ INICIAR (Espaço)";
+            document.getElementById('btnPlay').style.borderColor = isPlaying ? "var(--danger)" : "var(--accent)";
+            bc.postMessage({ type: 'play', val: isPlaying });
+        }
+
+        function resetScroll() {
+            isPlaying = false;
+            document.getElementById('btnPlay').innerText = "▶ INICIAR (Espaço)";
+            bc.postMessage({ type: 'reset' });
+            bc.postMessage({ type: 'play', val: false });
+        }
+
+        function toggleMirror() {
+            isMirrored = !isMirrored;
+            document.getElementById('btnMirror').innerText = isMirrored ? "ESPELHAMENTO: ON" : "ESPELHAMENTO: OFF";
+            updateSettings();
+        }
+
+        function applySettings(settings) {
+            currentSettings = settings;
+            prompterText.style.fontSize = settings.fontSize + 'px';
+            if (settings.mirrored) prompterText.classList.add('mirrored');
+            else prompterText.classList.remove('mirrored');
+        }
+
+        // Atalho Teclado
+        window.addEventListener('keydown', (e) => {
+            if (e.code === "Space" && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                togglePlay();
+            }
+        });
+    </script>
+</body>
+</html>

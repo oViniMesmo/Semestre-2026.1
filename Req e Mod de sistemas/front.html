@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador de Conta Bancária</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="conta">
+        <h1>Banco Digital</h1>
+        
+        <div class="saldo">
+            <p>Saldo Disponível</p>
+            <h2 id="saldo">R$ 1000,00</h2>
+        </div>
+
+        <div class="operacoes">
+            <input type="number" id="valor" placeholder="R$ 0,00" min="0">
+            <div class="botoes">
+                <button onclick="depositar()" class="btn-deposito">Depositar</button>
+                <button onclick="sacar()" class="btn-saque">Sacar</button>
+            </div>
+        </div>
+
+        <div class="extrato">
+            <h3>Histórico de Transações</h3>
+            <ul id="historico"> 
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
